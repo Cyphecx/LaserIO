@@ -1,18 +1,30 @@
 package com.direwolf20.laserio.common.items;
 
 import com.direwolf20.laserio.client.blockentityrenders.LaserNodeBERender;
+import com.direwolf20.laserio.common.blockentities.LaserNodeBE;
+import com.direwolf20.laserio.common.blocks.baseblocks.BaseLaserBlock;
 import com.direwolf20.laserio.common.containers.CardItemContainer;
 import com.direwolf20.laserio.common.items.cards.BaseCard;
+import com.direwolf20.laserio.common.network.PacketHandler;
+import com.direwolf20.laserio.common.network.packets.PacketCopyPasteNode;
+import com.direwolf20.laserio.util.*;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.items.ItemStackHandler;
@@ -46,6 +58,7 @@ public class CardCloner extends Item {
             tooltip.add(Component.translatable("laserio.tooltip.item.show_settings")
                     .withStyle(ChatFormatting.GRAY));
         } else {
+            // TODO Add tooltip info for node copying
             String cardType = getItemType(stack);
             MutableComponent toWrite = tooltipMaker("laserio.tooltip.item.filter.type", ChatFormatting.GRAY.getColor());
             int cardColor = ChatFormatting.WHITE.getColor();
@@ -69,7 +82,7 @@ public class CardCloner extends Item {
             int mode = !compoundTag.contains("mode") ? 0 : compoundTag.getByte("mode");;
             String currentMode = BaseCard.TransferMode.values()[mode].toString();
             toWrite = tooltipMaker("laserio.tooltip.item.card.mode", ChatFormatting.GRAY.getColor());
-            int modeColor = ChatFormatting.GRAY.getColor();
+            int modeColor = ChatFormatting.WHITE.getColor();
             if (currentMode.equals("EXTRACT"))
                 modeColor = ChatFormatting.RED.getColor();
             else if (currentMode.equals("INSERT"))
@@ -116,6 +129,10 @@ public class CardCloner extends Item {
         stack.getOrCreateTag().put("settings", tag);
     }
 
+    public static void saveNodeData(ItemStack stack, CompoundTag tag){
+        stack.getOrCreateTag().put("nodeData", tag);
+    }
+
     public static CompoundTag getSettings(ItemStack stack) {
         return stack.getOrCreateTag().getCompound("settings");
     }
@@ -159,5 +176,37 @@ public class CardCloner extends Item {
         else
             overclockStack = itemStackHandler.getStackInSlot(1);
         return overclockStack;
+    }
+
+    @Override
+    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        ItemStack cloneTool = player.getItemInHand(hand);
+        if (level.isClientSide()) //No client
+            return InteractionResultHolder.success(cloneTool);
+
+        int range = 10; // How far away you can click on blocks from
+        BlockHitResult lookingAt = VectorHelper.getLookingAt(player, ClipContext.Fluid.NONE, range);
+
+        if (lookingAt == null || !((level.getBlockState(VectorHelper.getLookingAt(player, cloneTool, range).getBlockPos()).getBlock() instanceof BaseLaserBlock))) {
+            if (player.isShiftKeyDown()) {
+                //Clear when shift clicking the air
+                return InteractionResultHolder.pass(cloneTool);
+            }
+        }
+
+        BlockPos targetPos = lookingAt.getBlockPos();
+        BlockEntity targetBE = level.getBlockEntity(targetPos);
+
+        // Check that targeted block is a laser node and bind to variable
+        if(!(targetBE instanceof LaserNodeBE))
+            return InteractionResultHolder.pass(cloneTool);
+
+        if (player.isShiftKeyDown()) {
+            PacketHandler.sendToServer(new PacketCopyPasteNode(targetBE.getBlockPos(), PacketCopyPasteNode.CLONER_COPY));
+        }
+        else {
+            PacketHandler.sendToServer(new PacketCopyPasteNode(targetBE.getBlockPos(), PacketCopyPasteNode.CLONER_PASTE));
+        }
+        return InteractionResultHolder.success(cloneTool);
     }
 }
