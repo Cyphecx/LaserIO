@@ -4,11 +4,9 @@ import com.direwolf20.laserio.common.blockentities.LaserNodeBE;
 import com.direwolf20.laserio.common.blocks.LaserNode;
 import com.direwolf20.laserio.common.containers.CardHolderContainer;
 import com.direwolf20.laserio.common.containers.LaserNodeContainer;
-import com.direwolf20.laserio.common.containers.customhandler.CardItemHandler;
 import com.direwolf20.laserio.common.items.CardCloner;
 import com.direwolf20.laserio.common.items.CardHolder;
 import com.direwolf20.laserio.common.items.cards.BaseCard;
-import com.direwolf20.laserio.common.items.cards.CardItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
@@ -24,17 +22,13 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.fml.Logging;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.*;
 import java.util.function.Supplier;
-
-import static com.direwolf20.laserio.setup.Registration.Card_Item;
 
 
 public class PacketCopyPasteNode {
@@ -61,7 +55,7 @@ public class PacketCopyPasteNode {
         return new PacketCopyPasteNode(buf.readBlockPos(), buf.readEnum(NodeCloneModes.class));
     }
 
-    public static void playSound(ServerPlayer player, Holder<SoundEvent> soundEventHolder) {
+    public static void playSound(ServerPlayer player, Holder<SoundEvent> soundEventHolder, float volume) {
         // Get player's position
         double x = player.getX();
         double y = player.getY();
@@ -82,7 +76,7 @@ public class PacketCopyPasteNode {
     }
 
     public static Map<Item, Integer> getCardsInNode(ItemStackHandler[] faceInventories){
-        Map<Item, Integer> existingCards = new HashMap<Item, Integer>();
+        Map<Item, Integer> existingCards = new HashMap<>();
         for (ItemStackHandler face : faceInventories) {
             for (int slot = 0; slot < LaserNodeContainer.CARDSLOTS; slot++) {
                 ItemStack card = face.getStackInSlot(slot);
@@ -129,27 +123,17 @@ public class PacketCopyPasteNode {
                     } else if(msg.action.equals(NodeCloneModes.PASTE)){
                         if (newTag.contains("nodeData")) {
                             ItemStack cardHolder = LaserNode.findCardHolders(player);
-                            IItemHandler cardHolderHandler = cardHolder.getCapability(ForgeCapabilities.ITEM_HANDLER, null).orElse(new ItemStackHandler(CardHolderContainer.SLOTS));
-
-                            ItemStackHandler[] currentNodeFaces = Arrays.stream(laserNode.nodeSideCaches).map(cache -> {
-                                return cache.itemHandler;
-                            }).toArray(ItemStackHandler[]::new);
+                            ItemStackHandler[] currentNodeFaces = Arrays.stream(laserNode.nodeSideCaches).map(cache -> cache.itemHandler).toArray(ItemStackHandler[]::new);
                             Map<Item, Integer> existingCards = getCardsInNode(currentNodeFaces);
                             Map<Item, Integer> neededCards = getCardsInNode(CardCloner.getNodeData(clonerStack));
                             Map<Item, Integer> holderCards = CardHolder.getHolderCardCounts(cardHolder);
 
-                            Map<Item, Integer> cardHolderDelta = new HashMap<Item, Integer>();
+                            Map<Item, Integer> cardHolderDelta = new HashMap<>();
                             existingCards.forEach((k, v) -> cardHolderDelta.merge(k, v, Integer::sum));
                             neededCards.forEach((k, v) -> cardHolderDelta.merge(k, -v, Integer::sum));
-                            Map<Item, Integer> netCards = new HashMap<Item, Integer>();
+                            Map<Item, Integer> netCards = new HashMap<>();
                             holderCards.forEach((k, v) -> netCards.merge(k, v, Integer::sum));
                             cardHolderDelta.forEach((k, v) -> netCards.merge(k, v, Integer::sum));
-
-                            System.out.println("Selected Node: " + existingCards);
-                            System.out.println("Copied Node: " + neededCards);
-                            System.out.println("Held cards: " + holderCards);
-                            System.out.println(cardHolderDelta);
-                            System.out.println(netCards);
 
                             // Make sure there are enough of all items to paste successfully.
                             if (netCards.entrySet().stream().allMatch(e -> e.getValue() >= 0)) {
