@@ -2,7 +2,6 @@ package com.direwolf20.laserio.common.network.packets;
 
 import com.direwolf20.laserio.common.blockentities.LaserNodeBE;
 import com.direwolf20.laserio.common.blocks.LaserNode;
-import com.direwolf20.laserio.common.containers.CardHolderContainer;
 import com.direwolf20.laserio.common.containers.LaserNodeContainer;
 import com.direwolf20.laserio.common.items.CardCloner;
 import com.direwolf20.laserio.common.items.CardHolder;
@@ -12,18 +11,14 @@ import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.*;
-import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -53,26 +48,6 @@ public class PacketCopyPasteNode {
 
     public static PacketCopyPasteNode decode(FriendlyByteBuf buf) {
         return new PacketCopyPasteNode(buf.readBlockPos(), buf.readEnum(NodeCloneModes.class));
-    }
-
-    public static void playSound(ServerPlayer player, Holder<SoundEvent> soundEventHolder, float volume) {
-        // Get player's position
-        double x = player.getX();
-        double y = player.getY();
-        double z = player.getZ();
-
-        // Create the packet
-        ClientboundSoundPacket packet = new ClientboundSoundPacket(
-                soundEventHolder, // The sound event
-                SoundSource.MASTER, // The sound category
-                x, y, z, // The sound location
-                0.5f, // The volume, 1 is normal, higher is louder
-                1, // The pitch, 1 is normal, higher is higher pitch
-                1 // A random for some reason? (Some sounds have different variants, like the enchanting table success
-        );
-
-        // Send the packet to the player
-        player.connection.send(packet);
     }
 
     public static Map<Item, Integer> getCardsInNode(ItemStackHandler[] faceInventories){
@@ -119,7 +94,7 @@ public class PacketCopyPasteNode {
                         laserNode.saveAdditional(nodeTag);
                         nodeTag.putInt("cloned", nodeTag.hashCode());
                         CardCloner.saveNodeData(clonerStack, nodeTag);
-                        playSound(player, Holder.direct(SoundEvent.createVariableRangeEvent(new ResourceLocation(SoundEvents.NOTE_BLOCK_BIT.get().getLocation().toString()))));
+                        PacketCopyPasteCard.playSound(player, Holder.direct(SoundEvent.createVariableRangeEvent(new ResourceLocation(SoundEvents.NOTE_BLOCK_BIT.get().getLocation().toString()))));
                     } else if(msg.action.equals(NodeCloneModes.PASTE)){
                         if (newTag.contains("nodeData")) {
                             ItemStack cardHolder = LaserNode.findCardHolders(player);
@@ -173,14 +148,14 @@ public class PacketCopyPasteNode {
 
                                 laserNode.load(newTag.getCompound("nodeData"));
                                 laserNode.updateThisNode();
-                                playSound(player, Holder.direct(SoundEvent.createVariableRangeEvent(new ResourceLocation(SoundEvents.EXPERIENCE_ORB_PICKUP.getLocation().toString()))));
+                                PacketCopyPasteCard.playSound(player, Holder.direct(SoundEvent.createVariableRangeEvent(new ResourceLocation(SoundEvents.EXPERIENCE_ORB_PICKUP.getLocation().toString()))));
                             } else {
                                 player.displayClientMessage(Component.translatable("message.laserio.cloner.cardcount"), true);
-                                playSound(player, Holder.direct(SoundEvent.createVariableRangeEvent(new ResourceLocation(SoundEvents.WAXED_SIGN_INTERACT_FAIL.getLocation().toString()))));
+                                PacketCopyPasteCard.playSound(player, Holder.direct(SoundEvent.createVariableRangeEvent(new ResourceLocation(SoundEvents.WAXED_SIGN_INTERACT_FAIL.getLocation().toString()))));
                             }
                         } else {
                             player.displayClientMessage(Component.translatable("message.laserio.cloner.nodata"), true);
-                            playSound(player, Holder.direct(SoundEvent.createVariableRangeEvent(new ResourceLocation(SoundEvents.WAXED_SIGN_INTERACT_FAIL.getLocation().toString()))));
+                            PacketCopyPasteCard.playSound(player, Holder.direct(SoundEvent.createVariableRangeEvent(new ResourceLocation(SoundEvents.WAXED_SIGN_INTERACT_FAIL.getLocation().toString()))));
                         }
                     }
                 }
